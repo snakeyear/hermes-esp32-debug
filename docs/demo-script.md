@@ -3,9 +3,9 @@
 Real, verified flow (2026-11-09, Windows 11 P5070P, Hermes v0.23.0, esp32-debug 0.1.2).
 
 **Hardware:** M5Stack StackChan (CoreS3, ESP32-S3 rev v0.2, 16MB flash) on **COM7** (native USB-Serial/JTAG `303a:1001`).
-**Firmware:** `C:\GdriveM\ESP32\StackChanAssistant-crashdemo` — the normal StackChanAssistant app plus a deliberate
+**Firmware:** `C:\path\to\StackChanAssistant-crashdemo` — the normal StackChanAssistant app plus a deliberate
 NULL-pointer read. **Tap the screen** (not the head touch strip) → `LoadProhibited`.
-**ELF:** `C:\GdriveM\ESP32\StackChanAssistant-crashdemo\build\m5stack.esp32.m5stack_cores3\StackChanAssistant-crashdemo.ino.elf`
+**ELF:** `C:\path\to\StackChanAssistant-crashdemo\build\m5stack.esp32.m5stack_cores3\StackChanAssistant-crashdemo.ino.elf`
 (SHA256 `2c9c09f1…`, matches the board's `ELF file SHA256: 2c9c09f13`).
 
 ## Before recording
@@ -23,10 +23,10 @@ NULL-pointer read. **Tap the screen** (not the head touch strip) → `LoadProhib
 | 0:06–0:14 | Type: **"My StackChan on USB crashes when I tap the screen. Listen to it for 30 seconds while I tap it."** | — |
 | 0:14–0:20 | `esp32_list_ports` card → `COM7`, `303a:1001`, *Espressif native USB*, confidence high. | "It finds the board by its USB ID." |
 | 0:20–0:34 | `esp32_serial_capture(port=COM7, seconds=30)` is running → **tap the screen** on camera → face freezes, board reboots. Result: `panic_detected: true`, `stop_reason: panic_captured`, `exception: EXCCAUSE 28 = LoadProhibited`, `fault_address: 0x00000006`, `elf_sha256_prefix: 2c9c09f13`. | "It catches the Guru Meditation, read-only — and redacts Wi-Fi names, tokens and IPs." |
-| 0:34–0:40 | Type: **"Decode it. The ELF is C:\GdriveM\ESP32\StackChanAssistant-crashdemo\build\…\StackChanAssistant-crashdemo.ino.elf"** | — |
+| 0:34–0:40 | Type: **"Decode it. The ELF is C:\path\to\StackChanAssistant-crashdemo\build\…\StackChanAssistant-crashdemo.ino.elf"** | — |
 | 0:40–0:58 | `esp32_decode_backtrace(elf_path=…)` (no log pasted: `log_source: last_capture (COM7, …)`) → `elf_sha256_match: true`; frames: **averageAccel() crash_demo.cpp:25** → processImuFrame() :32 → triggerCrashDemo() :40 → crashDemoPoll() :85 → loop() .ino:1056 → loopTask (framework). Source snippet with `>   25 \|  int32_t sum = frame->accel[0] + …`. | "Address to file and line — and it checks the ELF really is the firmware on the board." |
 | 0:58–0:72 | Hermes' answer: "`latestImuFrame()` returns NULL; `averageAccel()` reads `frame->accel[]` → EXCVADDR 0x6 = NULL + offset. Fix: check `if (!frame) return 0;` or initialise the IMU frame before use." Show the 3-line diff. Ignore the core-dump errors (hint says they're a missing partition, not the cause). | "Root cause and a concrete fix." |
-| 0:72–0:85 | Black card: **Read-only by design** · never flashes, erases or writes NVS/eFuses · chip info resets only with confirm · logs redacted · no network · MIT. `github.com/snackyear/hermes-esp32-debug`. | "esp32-debug for Hermes." |
+| 0:72–0:85 | Black card: **Read-only by design** · never flashes, erases or writes NVS/eFuses · chip info resets only with confirm · logs redacted · no network · MIT. `github.com/snakeyear/hermes-esp32-debug`. | "esp32-debug for Hermes." |
 
 Optional insert (0:14–0:20 alternative): "Which chip is this?" → Hermes asks before resetting → `esp32_chip_info(port=COM7,
 confirm_reset=true)` → `ESP32-S3 (QFN56) (revision v0.2)`, 16MB flash, esptool 5.3.1 auto-detected from Arduino15.
@@ -56,9 +56,9 @@ hints: NULL (or NULL+offset) dereference in the first frame; core-dump errors ar
 (Recorded with the timer trigger, so crashDemoPoll() is line 81; a screen tap gives line 85, a serial `crash` line 63.)
 
 ## Fallbacks
-- **No human hand free?** Arm a timed crash first: `pwsh -File C:\GdriveM\ESP32\StackChanAssistant-crashdemo\arm_crash.ps1 -Seconds 40`,
+- **No human hand free?** Arm a timed crash first: `pwsh -File C:\path\to\StackChanAssistant-crashdemo\arm_crash.ps1 -Seconds 40`,
   then ask Hermes to capture for 60 s. (The script opens COM7 with DTR/RTS released; a default pyserial open/close
   would reset the ESP32-S3 and cancel the timer.)
 - **Live capture flaky?** `esp32_decode_backtrace` also accepts the pasted log (`log_text`) — say "recorded log" on screen.
-- **Restore the original firmware:** `esptool --chip esp32s3 -p COM7 write-flash 0 C:\Users\plusl\Downloads\stackchan-COM7-backup-20261109.bin`
+- **Restore the original firmware:** `esptool --chip esp32s3 -p COM7 write-flash 0 %USERPROFILE%\Downloads\stackchan-COM7-backup-20261109.bin`
   (full 16 MB image, verified with `verify-flash`).

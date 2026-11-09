@@ -4,10 +4,10 @@ manifest_version: 2
 api_version: 1
 title: ESP32 Debug
 description: "Read-only ESP32 debugging for Hermes: list serial ports and flag ESP32 boards, read chip type / MAC / flash size through esptool (run as a subprocess; resets the board), capture a bounded and redacted serial log, and decode Guru Meditation / abort backtraces (Xtensa and RISC-V) to function and file:line with the Espressif addr2line, checking the ELF SHA256 against the log. Never flashes, erases or writes NVS / eFuses."
-author: snackyear
+author: snakeyear
 kind: general
 license: MIT
-homepage: https://github.com/snackyear/hermes-esp32-debug
+homepage: https://github.com/snakeyear/hermes-esp32-debug
 tags: [esp32, embedded, serial, debugging]
 requires_hermes: ">=0.23.0"
 provides_tools:

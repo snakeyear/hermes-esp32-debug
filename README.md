@@ -69,7 +69,7 @@ hermes plugins doctor esp32-debug
 hermes plugins list
 
 # B) from GitHub / the catalog (once published)
-hermes plugins install snackyear/hermes-esp32-debug --enable --yes-deps
+hermes plugins install snakeyear/hermes-esp32-debug --enable --yes-deps
 hermes gateway restart
 ```
 

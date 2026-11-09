@@ -3,15 +3,15 @@
 #   hermes plugins validate <checkout> --install-deps
 name: esp32-debug
 title: ESP32 Debug
-repo: https://github.com/snackyear/hermes-esp32-debug
+repo: https://github.com/snakeyear/hermes-esp32-debug
 sha: "REPLACE_WITH_FULL_40_CHAR_COMMIT_SHA"  # PLACEHOLDER: set after pushing; must be a full 40-hex commit
 subdir: ""
 description: "Read-only ESP32 / M5Stack debugging from Hermes: lists serial ports and flags ESP32 boards by USB VID:PID, reads chip type, MAC and flash size, captures a bounded serial log, and decodes Guru Meditation / abort backtraces (Xtensa and RISC-V) to function and file:line with the Espressif addr2line, checking the log's ELF SHA256 against the ELF. Disclosure — runs subprocesses: esptool (a standalone esptool.exe auto-detected under Arduino15/PlatformIO or set by the user, or '<python> -m esptool') with only 'flash-id'/'chip-id' (esptool is GPL, never imported; this RESETS the board and requires confirm_reset=true) and '<toolchain> addr2line -pfiaC -e <elf>'; opens the requested serial port for reading and toggles RTS/DTR only when a reset is requested; reads the ELF the user names, toolchain directories, and a few lines of the source files addr2line reports. Never flashes, erases or writes NVS/eFuses; nothing is written to the serial port. Logs are redacted (Wi-Fi SSID/password, tokens, keys, IPs) before they reach the model. No network calls, no telemetry, no stored credentials. Independent community project, not affiliated with Nous Research or Espressif."
-maintainer: snackyear
+maintainer: snakeyear
 tier: community
 category: tools
 requires_hermes: ">=0.23.0"
-docs_url: https://github.com/snackyear/hermes-esp32-debug#readme
+docs_url: https://github.com/snakeyear/hermes-esp32-debug#readme
 version: "0.1.2"
 readme: true
 platforms: []
