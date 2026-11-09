@@ -9,7 +9,7 @@ four **read-only** tools for ESP32 / M5Stack / StackChan boards on the serial po
 | --- | --- | --- |
 | `esp32_list_ports` | Lists serial/COM ports with VID:PID, description, manufacturer; flags ESP-like USB bridges (Espressif native USB `303a:*`, CP210x `10c4:ea60`, CH34x/CH9102 `1a86:*`, FTDI). | No — opens nothing |
 | `esp32_chip_info` | Chip type + revision, features, crystal, **MAC**, **flash size** via esptool `flash-id` (falls back to `chip-id`), run as a subprocess. | **Yes — resets the board** (ROM bootloader and back). Requires `confirm_reset: true`. |
-| `esp32_serial_capture` | Captures a bounded slice of serial output (time / line / byte limits, stops ~1.5 s after a panic). Masks Wi-Fi SSID/password, tokens, keys, IPs. Clear `port_busy` error if another program holds the port. | Reads only. Optional RTS pulse to reboot the app when `reset: true`. |
+| `esp32_serial_capture` | Captures a bounded slice of serial output (time / line / byte limits, stops ~1.5 s after a panic). Masks Wi-Fi SSID/password, tokens, keys, IPs. Clear `port_busy` error if another program holds the port. | Reads only. Optional RTS pulse to reboot the app when `reset: true`. Keeps the redacted log of the last capture in a temp file so the decoder can reuse it. |
 | `esp32_decode_backtrace` | Parses Guru Meditation / `abort()` / assert / watchdog / stack-overflow output — Xtensa `Backtrace: 0xPC:0xSP` (ESP32, S2, S3) and RISC-V `MEPC`/`RA` (C3, C6, H2, P4) — and resolves it with the Espressif `addr2line -pfiaC -e <elf>`. Decodes EXCCAUSE/MCAUSE, **checks the log's `ELF file SHA256` against your ELF**, marks project vs framework frames, adds heuristic hints and a source snippet. | No |
 
 Plus a bundled skill, `esp32-debug:esp32-crash-triage`, which walks the agent through
@@ -17,12 +17,15 @@ Plus a bundled skill, `esp32-debug:esp32-crash-triage`, which walks the agent th
 
 ## Demo flow
 
-> **You:** My StackChan keeps rebooting, what's wrong?
+Recorded on a real M5Stack StackChan (CoreS3 / ESP32-S3) on Windows — see `docs/demo-script.md`.
+
+> **You:** My StackChan crashes when I tap the screen. Listen to it while I tap it.
 >
-> **Hermes:** `esp32_list_ports` → COM12 (303a:1001, Espressif native USB) →
-> `esp32_serial_capture(port=COM12, reset=true)` → *Guru Meditation Error: Core 1 panic'ed (LoadProhibited)* →
-> `esp32_decode_backtrace(elf=…/firmware.elf)` → **`Face::draw(Avatar*)` at `src/face.cpp:57`**,
-> EXCVADDR `0x00000008` → NULL pointer + offset: `avatar->face` is used before `Avatar::init()` ran. Suggested fix: …
+> **Hermes:** `esp32_list_ports` → COM7 (303a:1001, Espressif native USB) →
+> `esp32_serial_capture(port=COM7, seconds=30)` → *Guru Meditation Error: Core 1 panic'ed (LoadProhibited)*, EXCVADDR `0x00000006` →
+> `esp32_decode_backtrace(elf_path=…\StackChanAssistant-crashdemo.ino.elf)` (reuses the capture, ELF SHA256 matches) →
+> **`averageAccel(ImuFrame const*)` at `crash_demo.cpp:25`** ← `processImuFrame()` :32 ← `loop()` →
+> NULL pointer + offset: `latestImuFrame()` returned NULL. Suggested fix: guard `if (!frame) …`.
 
 ## Requirements
 
@@ -57,7 +60,7 @@ Plugins load in the gateway plugin host, so restart the gateway after enabling.
 ```powershell
 # A) from a local copy (zip or git checkout)
 $plug = Join-Path $env:HERMES_HOME "plugins\esp32-debug"      # e.g. C:\Users\me\AppData\Local\hermes\plugins\esp32-debug
-Expand-Archive .\hermes-esp32-debug-0.1.1.zip -DestinationPath (Join-Path $env:HERMES_HOME "plugins")
+Expand-Archive .\hermes-esp32-debug-0.1.2.zip -DestinationPath (Join-Path $env:HERMES_HOME "plugins")
 #   -> plugin.yaml must sit directly in $plug
 hermes plugins validate $plug --install-deps
 hermes plugins enable esp32-debug       # interactive: answer the pyserial dependency prompt (there is no --yes flag)
@@ -108,6 +111,8 @@ This plugin is **read-only by design**:
   `<python> -m esptool`) with only `--port <port> --baud <baud> flash-id|chip-id` (`esp32_chip_info`) and `<toolchain>/xtensa-*-elf-addr2line` or `riscv32-esp-elf-addr2line -pfiaC -e <elf> <addresses>`
   (`esp32_decode_backtrace`). No shell (`shell=True`) is used. The `addr2line` path must have an Espressif addr2line file name.
 * **Serial port access:** enumerates ports; opens the requested port for reading; may toggle RTS/DTR when a reset is requested.
+* **Files written:** only `%TEMP%/hermes-esp32-debug/last_capture.json` (the already-redacted log of the most recent
+  capture, overwritten each time; override the folder with `ESP32_DEBUG_CACHE_DIR`). Nothing is written to the device.
 * **Reads outside the plugin's own data:** the `.elf` you point it at (to hash and resolve), toolchain directories (to find
   addr2line and esptool: `Arduino15\packages`, `.platformio`, `.espressif`), and — when `include_source` is on (default) — a few lines of the source files that addr2line names.
 * **No network calls, no telemetry, no stored credentials, no background processes.** Logs are redacted (SSID/password,

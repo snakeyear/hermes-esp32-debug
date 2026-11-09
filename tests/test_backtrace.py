@@ -215,7 +215,7 @@ def test_decode_with_mocked_subprocess_and_sha_mismatch(tmp_path, fixture_text, 
     assert any("ELF mismatch" in w for w in out["warnings"])
     cmd, kw = calls[0]
     assert cmd[:4] == [str(exe), "-pfiaC", "-e", str(elf)] and kw["timeout"] > 0
-    assert out["first_project_frame"]["location"] == "C:/proj/src/face.cpp:57"
+    assert out["first_project_frame"]["location"] == "C:\\proj\\src\\face.cpp:57"
 
 
 def test_decode_errors(tmp_path, fixture_text):

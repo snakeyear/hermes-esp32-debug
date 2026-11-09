@@ -12,7 +12,7 @@ tier: community
 category: tools
 requires_hermes: ">=0.23.0"
 docs_url: https://github.com/snackyear/hermes-esp32-debug#readme
-version: "0.1.1"
+version: "0.1.2"
 readme: true
 platforms: []
 known_issues:

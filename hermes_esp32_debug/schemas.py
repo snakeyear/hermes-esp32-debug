@@ -95,7 +95,8 @@ DECODE_BACKTRACE = {
         "properties": {
             "log_text": {
                 "type": "string",
-                "description": "Serial output containing the panic (e.g. from esp32_serial_capture).",
+                "description": ("Serial output containing the panic. Omit it (or pass 'last') to reuse the log "
+                                "of the most recent esp32_serial_capture, which avoids re-typing addresses."),
             },
             "elf_path": {"type": "string", "description": "Path to the firmware .elf for the flashed build."},
             "chip": {
@@ -116,7 +117,7 @@ DECODE_BACKTRACE = {
                 "description": "Include a few source lines around each resolved frame. Default true.",
             },
         },
-        "required": ["log_text", "elf_path"],
+        "required": ["elf_path"],
     },
 }
 

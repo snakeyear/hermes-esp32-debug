@@ -31,14 +31,25 @@ def classify_open_error(exc: BaseException) -> str:
     return "open_failed"
 
 
+def _set_rts(ser, value: bool) -> None:
+    ser.rts = value
+    # Windows usbser.sys (Espressif native USB-Serial/JTAG, many CDC bridges) only applies an
+    # RTS change when DTR is written too, so re-write DTR with its current value (esptool does
+    # the same). Harmless on other drivers.
+    ser.dtr = ser.dtr
+
+
 def reset_via_rts(ser, sleep: Callable[[float], None] = time.sleep) -> None:
     """Classic auto-reset: pull EN low through RTS while keeping IO0 (DTR) high,
-    so the chip restarts into the application, not the bootloader."""
+    so the chip restarts into the application, not the bootloader.
+
+    Timing follows esptool's hard reset for native USB (0.2 s hold, 0.2 s settle);
+    it also works for UART bridges with the standard two-transistor circuit."""
     ser.dtr = False
-    ser.rts = True
-    sleep(0.12)
-    ser.rts = False
-    sleep(0.05)
+    _set_rts(ser, True)
+    sleep(0.2)
+    _set_rts(ser, False)
+    sleep(0.2)
 
 
 def open_port(port: str, baud: int, serial_module=None):
@@ -90,6 +101,7 @@ def capture(
     total = 0
     stop_reason = "time_limit"
     panic_seen_at: Optional[float] = None
+    rebooting = False
     buf = b""
     try:
         if reset:
@@ -105,7 +117,7 @@ def capture(
             if now >= deadline:
                 stop_reason = "time_limit"
                 break
-            if panic_seen_at is not None and now - panic_seen_at > 1.5:
+            if panic_seen_at is not None and (now - panic_seen_at > 1.5 or rebooting):
                 stop_reason = "panic_captured"
                 break
             chunk = ser.read(max(1, min(4096, getattr(ser, "in_waiting", 0) or 1)))
@@ -121,6 +133,8 @@ def capture(
                     "Backtrace:" in text or "MEPC" in text or "abort() was called" in text
                 ):
                     panic_seen_at = clock()
+                if stop_on_panic and panic_seen_at is not None and "Rebooting..." in text:
+                    rebooting = True
                 if len(lines) >= max_lines:
                     break
             if len(lines) >= max_lines:

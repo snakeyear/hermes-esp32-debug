@@ -76,10 +76,16 @@ def search_roots(extra_dirs: Iterable[str] = ()) -> list[Path]:
     home = _home()
     local = os.environ.get("LOCALAPPDATA") or str(home / "AppData" / "Local")
     roots = [Path(d).expanduser() for d in extra_dirs if d]
+    arduino15 = [Path(local) / "Arduino15",          # Windows Arduino IDE 2 / arduino-cli
+                 home / ".arduino15",                  # Linux
+                 home / "Library" / "Arduino15"]       # macOS
+    for a15 in arduino15:
+        # Espressif's core first, then vendor cores that ship the same toolchain
+        # (e.g. packages/m5stack/tools/esp-x32/<ver>/bin).
+        roots.append(a15 / "packages" / "esp32" / "tools")
+        vendors = sorted(glob.glob(str(a15 / "packages" / "*" / "tools")))
+        roots += [Path(v) for v in vendors if Path(v).parent.name != "esp32"]
     roots += [
-        Path(local) / "Arduino15" / "packages" / "esp32" / "tools",      # Windows Arduino IDE 2 / arduino-cli
-        home / ".arduino15" / "packages" / "esp32" / "tools",             # Linux
-        home / "Library" / "Arduino15" / "packages" / "esp32" / "tools",  # macOS
         home / ".platformio" / "packages",
         home / ".espressif" / "tools",
         Path("C:/Espressif/tools"),

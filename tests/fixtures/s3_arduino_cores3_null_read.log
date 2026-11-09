@@ -1,0 +1,37 @@
+[mouth] pos=160152 > avail=156629 (skip)
+[head] cmd x=0 y=80 spd=200 | now x=25 y=75
+[crashdemo] trigger=serial -> processImuFrame()
+Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.
+
+Core  1 register dump:
+PC      : 0x42008edb  PS      : 0x00060630  A0      : 0x82008f01  A1      : 0x3fcebfa0  
+A2      : 0x00000000  A3      : 0x00000000  A4      : 0x3fcefc70  A5      : 0x00000000  
+A6      : 0x00000000  A7      : 0x00000000  A8      : 0x3fc9ef80  A9      : 0x3fca0fac  
+A10     : 0x3fcefa9c  A11     : 0x00000001  A12     : 0x8037f44a  A13     : 0x3fcb9480  
+A14     : 0x00060023  A15     : 0x00000003  SAR     : 0x00000008  EXCCAUSE: 0x0000001c  
+EXCVADDR: 0x00000006  LBEG    : 0x40056fc5  LEND    : 0x40056fe7  LCOUNT  : 0x00000000  
+
+
+Backtrace: 0x42008ed8:0x3fcebfa0 0x42008efe:0x3fcebfc0 0x42008f63:0x3fcebfe0 0x42009056:0x3fcec010 0x42008014:0x3fcec050 0x4203edec:0x3fcec0e0 0x4037f1ad:0x3fcec100
+
+
+
+
+ELF file SHA256: a9767c616
+
+E (16628) esp_core_dump_flash: Core dump flash config is corrupted! CRC=0x7bd5c66f instead of 0x0
+E (16636) esp_core_dump_elf: Elf write init failed!
+E (16641) esp_core_dump_common: Core dump write failed with error=-1
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x28 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x4037b46e
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce2820,len:0x10cc
+load:0x403c8700,len:0xc2c
+load:0x403cb700,len:0x30c0
+entry 0x403c88b8
+E (1498) esp_core_dump_flash: No core dump partition found!
+[crashdemo] StackChan crash demo build (Hermes esp32-debug)

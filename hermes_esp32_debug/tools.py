@@ -4,6 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import tempfile
+import time
+from pathlib import Path
 from typing import Any, Callable, Optional
 
 from . import backtrace as bt
@@ -53,9 +57,36 @@ def _serial_missing() -> Optional[str]:
                     "Re-enable the plugin so Hermes installs its declared dependency (pyserial).")
 
 
+def default_cache_dir() -> Path:
+    return Path(os.environ.get("ESP32_DEBUG_CACHE_DIR") or (Path(tempfile.gettempdir()) / "hermes-esp32-debug"))
+
+
+def _save_last_capture(cache_dir: Path, port: str, text: str) -> Optional[str]:
+    """Keep the (already redacted) log of the last capture so the decode step can use it without
+    the model re-typing hex addresses. Host-side temp file only; nothing goes to the device."""
+    try:
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        path = cache_dir / "last_capture.json"
+        tmp = path.with_suffix(".tmp")
+        tmp.write_text(json.dumps({"port": port, "time": time.time(), "log": text}, ensure_ascii=False),
+                       encoding="utf-8")
+        os.replace(tmp, path)
+        return str(path)
+    except OSError:
+        return None
+
+
+def _load_last_capture(cache_dir: Path) -> Optional[dict]:
+    try:
+        return json.loads((cache_dir / "last_capture.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None
+
+
 def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=None, list_ports_module=None,
-                  runner=None) -> dict[str, Callable[..., str]]:
+                  runner=None, cache_dir: Optional[Path] = None) -> dict[str, Callable[..., str]]:
     """Build handlers bound to a settings getter (``ctx.get_config``) and optional test doubles."""
+    cache = Path(cache_dir) if cache_dir else default_cache_dir()
 
     def setting(key: str, default: Any) -> Any:
         try:
@@ -126,15 +157,34 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             if redacted:
                 text = redact(text)
             info = bt.parse_panic(text)
+            panic = bool(info.backtrace or info.reason or info.abort_pc)
+            decodable = bool(info.backtrace or info.abort_pc or "MEPC" in info.registers)
+            if text.strip():
+                _save_last_capture(cache, port, text)
+            summary = {k: v for k, v in info.as_dict().items() if k in (
+                "reason", "core", "chip_hint", "elf_sha256_prefix", "reset_reasons", "panic_count")}
+            if panic:
+                exc = bt.describe_exception(info)
+                if exc:
+                    summary["exception"] = exc
+                fault = info.registers.get("EXCVADDR") or info.registers.get("MTVAL")
+                if fault:
+                    summary["fault_address"] = fault
+                summary["backtrace_frames"] = len(info.backtrace)
+            hint = None
+            if not res["lines"]:
+                hint = ("No output at all. Check the port, the baud rate, and (Arduino) that 'USB CDC On Boot' is "
+                        "enabled for native-USB boards; or capture with reset=true to see the boot log.")
             return _dump({
                 "ok": True, "port": port, "baud": baud, "line_count": len(res["lines"]), "bytes": res["bytes"],
                 "stop_reason": res["stop_reason"], "redacted": redacted,
-                "panic_detected": bool(info.backtrace or info.reason or info.abort_pc),
-                "panic_summary": {k: v for k, v in info.as_dict().items() if k in (
-                    "reason", "core", "chip_hint", "elf_sha256_prefix", "reset_reasons", "panic_count")},
+                "panic_detected": panic,
+                "panic_summary": summary,
                 "log": text,
-                "next_step": ("Panic found: call esp32_decode_backtrace with this log and the build's .elf."
-                              if (info.backtrace or info.abort_pc or "MEPC" in info.registers) else None),
+                "hint": hint,
+                "next_step": ("Panic found: call esp32_decode_backtrace with elf_path set to the build's .elf. "
+                              "log_text can be omitted: the decoder reuses this capture."
+                              if decodable else None),
             })
         except Exception as exc:
             logger.exception("esp32_serial_capture failed")
@@ -145,8 +195,13 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             args = args or {}
             log_text = str(args.get("log_text") or "")
             elf_path = str(args.get("elf_path") or "").strip()
-            if not log_text.strip():
-                return _err("bad_args", "log_text is required.")
+            log_source = "log_text"
+            if not log_text.strip() or log_text.strip().lower() in ("last", "last_capture"):
+                last = _load_last_capture(cache)
+                if not last or not str(last.get("log") or "").strip():
+                    return _err("bad_args", "log_text is required (no earlier esp32_serial_capture to reuse).")
+                log_text = str(last["log"])
+                log_source = f"last_capture ({last.get('port')}, {int(max(0, time.time() - float(last.get('time') or 0)))} s ago)"
             if not elf_path:
                 return _err("bad_args", "elf_path is required (the .elf of the exact build on the board).")
             info = bt.parse_panic(log_text, which="first" if args.get("which_panic") == "first" else "last")
@@ -200,6 +255,7 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             first_user = next((f for f in frames if f["in_project"] and f["location"]), None)
             out = {
                 "ok": True,
+                "log_source": log_source,
                 "chip": chip, "arch": arch, "addr2line": a2l, "elf": elf_path,
                 "elf_sha256_match": sha_match,
                 "panic": {**info.as_dict(), "exception": bt.describe_exception(info)},

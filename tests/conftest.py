@@ -9,6 +9,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+@pytest.fixture(autouse=True)
+def _isolated_cache(tmp_path, monkeypatch):
+    """Keep the last-capture cache out of the real temp dir."""
+    monkeypatch.setenv("ESP32_DEBUG_CACHE_DIR", str(tmp_path / "cache"))
+
+
 @pytest.fixture
 def fixture_text():
     def _read(name: str) -> str:
@@ -52,12 +58,15 @@ class FakeSerial:
         self.is_open = False
         self.closed = False
         self.rts_history = []
+        self.dtr_writes = 0
         self._buf = bytearray(type(self).data)
         type(self).instances.append(self)
 
     def __setattr__(self, k, v):
         if k == "rts" and getattr(self, "rts_history", None) is not None:
             self.rts_history.append(v)
+        if k == "dtr" and getattr(self, "dtr_writes", None) is not None:
+            object.__setattr__(self, "dtr_writes", self.dtr_writes + 1)
         object.__setattr__(self, k, v)
 
     def open(self):

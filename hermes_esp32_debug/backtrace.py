@@ -30,6 +30,7 @@ RST_RE = re.compile(r"rst:0x(?P<code>[0-9a-fA-F]+)\s*\((?P<name>[A-Z_0-9]+)\)")
 WDT_RE = re.compile(r"Task watchdog got triggered|Interrupt wdt timeout|TG\dWDT_SYS_RST|RTCWDT_RTC_RST", re.IGNORECASE)
 STACK_RE = re.compile(r"Stack canary watchpoint triggered \((?P<task>[^)]+)\)|stack overflow in task (?P<task2>\S+)", re.IGNORECASE)
 BROWNOUT_RE = re.compile(r"Brownout detector was triggered", re.IGNORECASE)
+COREDUMP_NOISE_RE = re.compile(r"esp_core_dump\w*: (?:No core dump partition found|Core dump flash config is corrupted|Elf write init failed|Core dump write failed)")
 
 XTENSA_EXCCAUSE = {
     0: "IllegalInstruction", 2: "InstructionFetchError", 3: "LoadStoreError",
@@ -66,15 +67,23 @@ class PanicInfo:
     stack_overflow_task: Optional[str] = None
     watchdog: bool = False
     brownout: bool = False
+    coredump_unavailable: bool = False
     panic_count: int = 0
 
     def addresses(self) -> list[str]:
         """Addresses to resolve, in order, de-duplicated."""
         seen: list[str] = []
+        pc = int(self.registers["PC"], 16) if "PC" in self.registers else None
+        bt = list(self.backtrace)
+        # ESP-IDF prints the first Xtensa backtrace entry as PC adjusted by up to 3 bytes
+        # (esp_cpu_process_stack_pc). It is the same frame as the PC register, and resolving it
+        # separately yields a misleading second line (often the function's opening brace).
+        if pc is not None and bt and 0 <= pc - int(bt[0], 16) <= 3:
+            bt = bt[1:]
         for a in ([self.registers.get("PC")] if "PC" in self.registers else []) + \
                  ([self.registers.get("MEPC")] if "MEPC" in self.registers else []) + \
                  ([self.registers.get("RA")] if "RA" in self.registers else []) + \
-                 ([self.abort_pc] if self.abort_pc else []) + self.backtrace:
+                 ([self.abort_pc] if self.abort_pc else []) + bt:
             if a and a not in seen and _is_code_addr(int(a, 16)):
                 seen.append(a)
         return seen
@@ -95,6 +104,7 @@ def parse_panic(text: str, *, which: str = "last") -> PanicInfo:
     info.reset_reasons = [m.group("name") for m in RST_RE.finditer(text)]
     info.brownout = bool(BROWNOUT_RE.search(text))
     info.watchdog = bool(WDT_RE.search(text))
+    info.coredump_unavailable = bool(COREDUMP_NOISE_RE.search(text))
 
     gurus = list(GURU_RE.finditer(text))
     bts = list(BACKTRACE_LINE_RE.finditer(text))
@@ -198,6 +208,9 @@ def hints(info: PanicInfo) -> list[str]:
         out.append("IllegalInstruction/InstFetchProhibited: usually a corrupted function pointer, stack corruption, or calling into freed memory.")
     if info.backtrace_corrupted:
         out.append("Backtrace is marked CORRUPTED: the stack itself was damaged; the first frames are still the most trustworthy.")
+    if info.coredump_unavailable and (info.backtrace or info.reason or info.abort_pc):
+        out.append("The 'esp_core_dump ... failed / no core dump partition' errors are a side effect of the partition "
+                   "table having no coredump partition. They are not the cause of the crash; the backtrace is.")
     if len(info.reset_reasons) >= 3:
         out.append(f"{len(info.reset_reasons)} resets seen in this capture: the board is boot-looping.")
     return out
@@ -228,6 +241,13 @@ FRAME_RE = re.compile(r"^(?P<addr>0x[0-9a-fA-F]+):\s*(?P<func>.*?) at (?P<loc>.+
 INLINE_RE = re.compile(r"^\s*\(inlined by\)\s*(?P<func>.*?) at (?P<loc>.+)$")
 
 
+def _clean_path(path: str) -> str:
+    """Windows builds mix separators ("C:\\sketch/crash_demo.cpp"); use backslashes for drive paths."""
+    if re.match(r"^[A-Za-z]:[\\/]", path):
+        return path.replace("/", "\\")
+    return path
+
+
 def _split_loc(loc: str) -> tuple[str, Optional[int]]:
     loc = loc.strip()
     loc = re.sub(r"\s*\(discriminator \d+\)$", "", loc)
@@ -235,7 +255,7 @@ def _split_loc(loc: str) -> tuple[str, Optional[int]]:
     if not m:
         return loc, None
     line = m.group("line")
-    return m.group("file"), (int(line) if line.isdigit() else None)
+    return _clean_path(m.group("file")), (int(line) if line.isdigit() else None)
 
 
 def parse_addr2line_output(output: str) -> list[dict]:

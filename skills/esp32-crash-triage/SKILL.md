@@ -12,7 +12,8 @@ Use when the user says a board "keeps rebooting", "crashes", shows "Guru Meditat
    Skip it when the boot log already shows `ESP-ROM:esp32s3-...`.
 3. **Capture.** `esp32_serial_capture` with `reset: true`, `seconds: 15`. On `port_busy`, ask the user to close
    Arduino Serial Monitor / `idf.py monitor`. If no panic appears, capture again for longer without reset.
-4. **Decode.** `esp32_decode_backtrace` with the captured `log` and the `.elf` of the flashed build
+   If the user will trigger the crash by hand (tap, button), capture without reset for 20–30 s and tell them to do it now.
+4. **Decode.** `esp32_decode_backtrace` with `elf_path` = the `.elf` of the flashed build; omit `log_text` to reuse the last capture
    (Arduino IDE: *Sketch → Export Compiled Binary* or the temp build folder; PlatformIO: `.pio/build/<env>/firmware.elf`;
    ESP-IDF: `build/<project>.elf`). If `elf_sha256_match` is false, stop and ask for the right ELF.
 5. **Explain.** Lead with `first_project_frame` (function + file:line), the exception, and the top hint.
