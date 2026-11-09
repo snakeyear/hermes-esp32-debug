@@ -90,7 +90,8 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             python = setting("esptool_python", None)
             timeout = float(_int(setting("esptool_timeout", 45), 45))
             kw = {"runner": runner} if runner else {}
-            result = chipinfo.chip_info(port, python=python, baud=baud, timeout=timeout, **kw)
+            result = chipinfo.chip_info(port, python=python, esptool_path=setting("esptool_path", None),
+                                        baud=baud, timeout=timeout, **kw)
             if "output_tail" in result and _bool(setting("redact", True), True):
                 result["output_tail"] = redact(result["output_tail"])
             result["port"] = port

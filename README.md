@@ -19,8 +19,8 @@ Plus a bundled skill, `esp32-debug:esp32-crash-triage`, which walks the agent th
 
 > **You:** My StackChan keeps rebooting, what's wrong?
 >
-> **Hermes:** `esp32_list_ports` → COM5 (303a:1001, Espressif native USB) →
-> `esp32_serial_capture(port=COM5, reset=true)` → *Guru Meditation Error: Core 1 panic'ed (LoadProhibited)* →
+> **Hermes:** `esp32_list_ports` → COM12 (303a:1001, Espressif native USB) →
+> `esp32_serial_capture(port=COM12, reset=true)` → *Guru Meditation Error: Core 1 panic'ed (LoadProhibited)* →
 > `esp32_decode_backtrace(elf=…/firmware.elf)` → **`Face::draw(Avatar*)` at `src/face.cpp:57`**,
 > EXCVADDR `0x00000008` → NULL pointer + offset: `avatar->face` is used before `Avatar::init()` ran. Suggested fix: …
 
@@ -28,8 +28,15 @@ Plus a bundled skill, `esp32-debug:esp32-crash-triage`, which walks the agent th
 
 * Hermes Agent **≥ 0.23.0** (tested against v0.23.0; native Windows is the primary target, Linux/macOS work too).
 * `pyserial` — declared in `pyproject.toml`; Hermes installs it when you enable the plugin.
-* For `esp32_chip_info`: **esptool** installed in some Python (`pip install esptool`). It does not have to be on
-  `PATH` — set the plugin setting `esptool_python` to that interpreter. esptool is GPL and is never imported.
+* For `esp32_chip_info`: an **esptool** you already have. Resolution order (first match wins):
+  1. setting `esptool_path` — explicit `esptool.exe` / `esptool` / `esptool.py` (other file names are refused);
+  2. setting `esptool_python` — a Python with the esptool module, run as `<python> -m esptool`;
+  3. auto-detect: the standalone `esptool.exe` the Arduino ESP32 / M5Stack cores install under
+     `%LOCALAPPDATA%\Arduino15\packages\*\tools\esptool_py\<version>\` (highest version wins), then
+     PlatformIO's `~/.platformio/packages/tool-esptoolpy`;
+  4. Hermes' own Python, `python -m esptool`.
+
+  With the Arduino ESP32 core installed, nothing needs configuring. esptool is GPL and is never imported.
 * For `esp32_decode_backtrace`: the Espressif toolchain (comes with the Arduino-ESP32 core, PlatformIO or ESP-IDF)
   and the **`.elf` of the exact build** that is flashed (not the `.bin`).
 
@@ -44,27 +51,36 @@ Plus a bundled skill, `esp32-debug:esp32-crash-triage`, which walks the agent th
 
 ### Windows (PowerShell)
 
+On Windows the Hermes home is `%HERMES_HOME%` (default `C:\Users\<you>\AppData\Local\hermes`), **not** `~/.hermes`.
+Plugins load in the gateway plugin host, so restart the gateway after enabling.
+
 ```powershell
-# from the catalog, once listed
-hermes plugins install esp32-debug --enable
-
-# or straight from GitHub
-hermes plugins install snackyear/hermes-esp32-debug --enable
-
-# or from a local checkout
-git clone https://github.com/snackyear/hermes-esp32-debug "$env:USERPROFILE\.hermes\plugins\esp32-debug"
-hermes plugins enable esp32-debug      # consents to and installs pyserial
+# A) from a local copy (zip or git checkout)
+$plug = Join-Path $env:HERMES_HOME "plugins\esp32-debug"      # e.g. C:\Users\me\AppData\Local\hermes\plugins\esp32-debug
+Expand-Archive .\hermes-esp32-debug-0.1.1.zip -DestinationPath (Join-Path $env:HERMES_HOME "plugins")
+#   -> plugin.yaml must sit directly in $plug
+hermes plugins validate $plug --install-deps
+hermes plugins enable esp32-debug       # interactive: answer the pyserial dependency prompt (there is no --yes flag)
+hermes gateway restart                  # required: tools register in the gateway plugin host
 hermes plugins doctor esp32-debug
+hermes plugins list
+
+# B) from GitHub / the catalog (once published)
+hermes plugins install snackyear/hermes-esp32-debug --enable --yes-deps
+hermes gateway restart
 ```
 
-Optional settings (Desktop: Settings → Plugins → esp32-debug, or `config.yaml`):
+If `$env:HERMES_HOME` is empty in your shell, use `C:\Users\<you>\AppData\Local\hermes` directly.
+
+Optional settings (Desktop: Settings → Plugins → esp32-debug, or `config.yaml` under `%HERMES_HOME%`):
 
 ```yaml
 plugins:
   entries:
     esp32-debug:
       settings:
-        esptool_python: C:\Users\me\AppData\Local\Programs\Python\Python312\python.exe
+        esptool_path: C:\Users\me\AppData\Local\Arduino15\packages\esp32\tools\esptool_py\5.3.1\esptool.exe  # optional; auto-detected
+        esptool_python: ""        # only if you prefer a Python with the esptool module
         addr2line_path: ""        # empty = auto-detect
         toolchain_dirs: []
         default_baud: 115200
@@ -72,7 +88,7 @@ plugins:
         redact: true
 ```
 
-Find which Python has esptool: `py -0p`, then `<python> -m esptool version`.
+Quick check: ask Hermes "list my ESP32 ports" — an ESP32-S3 on native USB shows as e.g. `COM12  303a:1001`.
 
 ## Safety boundary (read before installing)
 
@@ -88,12 +104,12 @@ This plugin is **read-only by design**:
 
 ### Disclosure (catalog rule 13)
 
-* **Shell commands / subprocesses:** runs `<python> -m esptool --port <port> --baud <baud> flash-id|chip-id`
-  (`esp32_chip_info`) and `<toolchain>/xtensa-*-elf-addr2line` or `riscv32-esp-elf-addr2line -pfiaC -e <elf> <addresses>`
+* **Shell commands / subprocesses:** runs esptool (`esptool_path`, an auto-detected Arduino/PlatformIO `esptool.exe`, or
+  `<python> -m esptool`) with only `--port <port> --baud <baud> flash-id|chip-id` (`esp32_chip_info`) and `<toolchain>/xtensa-*-elf-addr2line` or `riscv32-esp-elf-addr2line -pfiaC -e <elf> <addresses>`
   (`esp32_decode_backtrace`). No shell (`shell=True`) is used. The `addr2line` path must have an Espressif addr2line file name.
 * **Serial port access:** enumerates ports; opens the requested port for reading; may toggle RTS/DTR when a reset is requested.
 * **Reads outside the plugin's own data:** the `.elf` you point it at (to hash and resolve), toolchain directories (to find
-  addr2line), and — when `include_source` is on (default) — a few lines of the source files that addr2line names.
+  addr2line and esptool: `Arduino15\packages`, `.platformio`, `.espressif`), and — when `include_source` is on (default) — a few lines of the source files that addr2line names.
 * **No network calls, no telemetry, no stored credentials, no background processes.** Logs are redacted (SSID/password,
   tokens, keys, IPs) before they are returned to the model; turn off with `redact: false`.
 

@@ -7,8 +7,9 @@ Third-party software this plugin interacts with (none of it is bundled or import
   https://github.com/pyserial/pyserial
 
 * esptool (GPL-2.0-or-later) — NOT a dependency and NOT imported. When the user calls
-  esp32_chip_info, the plugin runs "<python> -m esptool --port <port> flash-id" (or chip-id)
-  as a separate process and parses its text output. The user installs esptool themselves.
+  esp32_chip_info, the plugin runs an esptool the user already has (a standalone esptool.exe
+  installed by the Arduino ESP32 core / PlatformIO, or "<python> -m esptool") with only
+  "--port <port> flash-id" (or chip-id) as a separate process and parses its text output.
   https://github.com/espressif/esptool
 
 * Espressif GNU toolchain addr2line (GPL-3.0-or-later, binutils) — NOT bundled. Located on the

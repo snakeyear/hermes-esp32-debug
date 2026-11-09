@@ -8,7 +8,7 @@ Before recording: close Arduino Serial Monitor; mask the taskbar clock/user name
 | --- | --- | --- |
 | 0:00–0:07 | Board on camera: face appears, freezes, screen goes black, reboots. Loop twice. | "My StackChan keeps rebooting. Let's ask Hermes." |
 | 0:07–0:14 | Type: **"My StackChan keeps rebooting. Find out why — the ELF is at C:\…\StackChanAssistant\.pio\build\m5stack-cores3\firmware.elf"** | — |
-| 0:14–0:22 | `esp32_list_ports` card → COM5 `303a:1001` *Espressif native USB*, confidence high. | "It finds the board by its USB ID — no port guessing." |
+| 0:14–0:22 | `esp32_list_ports` card → COM12 `303a:1001` *Espressif native USB*, confidence high. | "It finds the board by its USB ID — no port guessing." |
 | 0:22–0:32 | Hermes asks "chip info resets the board, OK?" → you: "yes". `esp32_chip_info` → ESP32-S3 (QFN56) rev v0.2, 16MB flash, PSRAM 8MB. | "Chip info resets the board, so it asks first." |
 | 0:32–0:45 | `esp32_serial_capture(reset=true)` → log scrolls; `Guru Meditation Error: Core 1 panic'ed (LoadProhibited)`; zoom on `wifi:connected with <redacted>` and `<ip>`. | "It captures the crash — and masks my Wi-Fi name, tokens and IPs before the model sees them." |
 | 0:45–0:60 | `esp32_decode_backtrace` → `elf_sha256_match: true`; frames: **Face::draw(Avatar*) at src/face.cpp:57**, Avatar::update() 112, loop() 88; framework frames greyed; source snippet with `>   57 |` highlighted. | "The backtrace becomes file and line — and it checks the ELF really matches the firmware on the board." |

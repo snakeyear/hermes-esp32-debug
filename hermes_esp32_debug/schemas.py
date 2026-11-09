@@ -29,7 +29,7 @@ CHIP_INFO = {
     "description": (
         "Identify the ESP32 on a serial port: chip type and revision, features, crystal, MAC "
         "address and flash size, by running esptool's read-only 'flash-id' (and 'chip-id' if "
-        "needed) as a subprocess. WARNING: this RESETS THE BOARD into the ROM bootloader and "
+        "needed) as a subprocess (standalone esptool.exe from Arduino/PlatformIO or python -m esptool). WARNING: this RESETS THE BOARD into the ROM bootloader and "
         "back — the running firmware restarts and any conversation or state on the device is "
         "lost, and the port must not be open in another program. Ask the user before calling "
         "unless they already asked for chip info. You must pass confirm_reset=true." + SAFETY

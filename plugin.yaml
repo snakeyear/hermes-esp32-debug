@@ -1,5 +1,5 @@
 name: esp32-debug
-version: 0.1.0
+version: 0.1.1
 manifest_version: 2
 api_version: 1
 title: ESP32 Debug
@@ -19,11 +19,16 @@ provides_hooks: []
 provides_middleware: []
 requires_env: []
 config_schema:
+  esptool_path:
+    type: str
+    default: ""
+    label: "esptool executable"
+    description: "Explicit esptool launcher, named esptool, esptool.exe or esptool.py (e.g. the one Arduino installs: %LOCALAPPDATA%\\Arduino15\\packages\\esp32\\tools\\esptool_py\\5.3.1\\esptool.exe). Highest priority. Empty = esptool_python, then auto-detect (Arduino15 esptool_py, PlatformIO tool-esptoolpy), then Hermes' own Python."
   esptool_python:
     type: str
     default: ""
     label: "Python with esptool"
-    description: "Interpreter used as '<python> -m esptool' (esptool is GPL and is never imported). Empty = Hermes' own Python. Example: C:\\Users\\me\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+    description: "Python that has the esptool module, run as '<python> -m esptool' (esptool is GPL and is never imported). Used when esptool_path is empty."
   esptool_timeout:
     type: int
     default: 45

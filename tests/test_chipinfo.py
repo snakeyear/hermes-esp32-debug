@@ -97,7 +97,8 @@ def test_chip_info_single_reset_when_flash_id_has_everything():
     assert "import esptool" not in open(chipinfo.__file__, encoding="utf-8").read()
 
 
-def test_chip_info_defaults_to_sys_executable():
+def test_chip_info_defaults_to_sys_executable(monkeypatch):
+    monkeypatch.setattr(chipinfo, "autodetect_esptool", lambda: None)
     r = Runner([(0, ESPTOOL5_FLASH_ID)])
     chipinfo.chip_info("COM5", runner=r)
     assert r.calls[0][0][0] == sys.executable
@@ -152,3 +153,96 @@ def test_real_esptool5_wrapped_messages():
     assert chipinfo.classify_error(nf) == "port_not_found"
     assert chipinfo.classify_error(busy) == "port_busy"
     assert chipinfo.classify_error("Could not open COM5, the port is busy or doesn't exist.") == "port_unavailable"
+
+
+# ---------------- esptool launcher resolution ----------------
+
+def _touch(p):
+    p.parent.mkdir(parents=True, exist_ok=True)
+    p.write_text("")
+    return p
+
+
+@pytest.fixture
+def fake_home(tmp_path, monkeypatch):
+    home = tmp_path / "home"
+    local = home / "AppData" / "Local"
+    home.mkdir()
+    monkeypatch.setattr(chipinfo, "_home", lambda: home)
+    monkeypatch.setenv("LOCALAPPDATA", str(local))
+    return home, local
+
+
+def test_autodetect_picks_highest_arduino_version_across_packages(fake_home):
+    home, local = fake_home
+    pk = local / "Arduino15" / "packages"
+    _touch(pk / "m5stack" / "tools" / "esptool_py" / "5.3.0" / "esptool.exe")
+    best = _touch(pk / "esp32" / "tools" / "esptool_py" / "5.3.1" / "esptool.exe")
+    _touch(pk / "esp32" / "tools" / "esptool_py" / "4.10.0" / "esptool.exe")
+    _touch(pk / "esp32" / "tools" / "esptool_py" / "5.10.0" / "README.txt")  # no binary: ignored
+    assert chipinfo.autodetect_esptool() == best
+    launcher, source = chipinfo.resolve_esptool()
+    assert launcher == [str(best)] and source == "autodetect"
+
+
+def test_autodetect_platformio_script_runs_with_python(fake_home):
+    home, _ = fake_home
+    script = _touch(home / ".platformio" / "packages" / "tool-esptoolpy" / "esptool.py")
+    launcher, source = chipinfo.resolve_esptool()
+    assert launcher == [sys.executable, str(script)] and source == "autodetect"
+
+
+def test_resolution_order(fake_home, tmp_path):
+    home, local = fake_home
+    auto = _touch(local / "Arduino15" / "packages" / "esp32" / "tools" / "esptool_py" / "5.3.1" / "esptool.exe")
+    explicit = _touch(tmp_path / "tools" / "esptool.exe")
+    # 1. esptool_path wins over everything
+    assert chipinfo.resolve_esptool(str(explicit), "C:/Py/python.exe") == ([str(explicit)], "esptool_path")
+    # 2. esptool_python beats auto-detect
+    assert chipinfo.resolve_esptool(None, "C:/Py/python.exe") == (["C:/Py/python.exe", "-m", "esptool"], "esptool_python")
+    # 3. auto-detect
+    assert chipinfo.resolve_esptool() == ([str(auto)], "autodetect")
+    # 4. Hermes' own python
+    auto.unlink()
+    assert chipinfo.resolve_esptool() == ([sys.executable, "-m", "esptool"], "hermes_python")
+
+
+@pytest.mark.parametrize("name", ["calc.exe", "esptool_wrapper.bat", "python.exe", "esptool.cmd"])
+def test_explicit_esptool_path_name_is_enforced(tmp_path, name):
+    bad = _touch(tmp_path / name)
+    with pytest.raises(chipinfo.EsptoolPathError):
+        chipinfo.resolve_esptool(str(bad))
+    res = chipinfo.chip_info("COM12", esptool_path=str(bad), runner=Runner([]))
+    assert res["ok"] is False and res["error"] == "esptool_path_rejected"
+
+
+def test_explicit_esptool_path_must_exist(tmp_path):
+    with pytest.raises(chipinfo.EsptoolPathError):
+        chipinfo.resolve_esptool(str(tmp_path / "esptool.exe"))
+
+
+def test_standalone_exe_command_line_and_allow_list(tmp_path):
+    exe = _touch(tmp_path / "esptool_py" / "5.3.1" / "esptool.exe")
+    r = Runner([(0, ESPTOOL5_FLASH_ID)])
+    res = chipinfo.chip_info("COM12", esptool_path=str(exe), runner=r)
+    assert res["ok"] and res["esptool"]["source"] == "esptool_path"
+    assert r.calls[0][0] == [str(exe), "--port", "COM12", "--baud", "115200", "flash-id"]
+    for bad in ("write-flash", "erase_flash", "merge-bin", "read-flash"):
+        with pytest.raises(ValueError):
+            chipinfo.build_command([str(exe)], "COM12", bad)
+
+
+def test_missing_launcher_is_reported(tmp_path, monkeypatch):
+    monkeypatch.setattr(chipinfo, "autodetect_esptool", lambda: None)
+    res = chipinfo.chip_info("COM12", runner=Runner([FileNotFoundError("nope")]))
+    assert res["ok"] is False and res["error"] == "esptool_missing" and "esptool_path" in res["help"]
+
+
+def test_handler_passes_esptool_path_setting(tmp_path):
+    exe = _touch(tmp_path / "esptool.exe")
+    r = Runner([(0, ESPTOOL5_FLASH_ID)])
+    settings = {"esptool_path": str(exe), "esptool_python": "C:/ignored/python.exe"}
+    h = make_handlers(lambda k, d=None: settings.get(k, d), runner=r)
+    out = json.loads(h["esp32_chip_info"]({"port": "COM12", "confirm_reset": True}))
+    assert out["ok"] and out["esptool"]["source"] == "esptool_path"
+    assert r.calls[0][0][0] == str(exe)
