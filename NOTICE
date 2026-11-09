@@ -1,0 +1,22 @@
+hermes-esp32-debug
+Copyright (c) 2026 snackyear — MIT License (see LICENSE)
+
+Third-party software this plugin interacts with (none of it is bundled or imported):
+
+* pyserial (BSD-3-Clause) — declared Python dependency, used for port listing and serial capture.
+  https://github.com/pyserial/pyserial
+
+* esptool (GPL-2.0-or-later) — NOT a dependency and NOT imported. When the user calls
+  esp32_chip_info, the plugin runs "<python> -m esptool --port <port> flash-id" (or chip-id)
+  as a separate process and parses its text output. The user installs esptool themselves.
+  https://github.com/espressif/esptool
+
+* Espressif GNU toolchain addr2line (GPL-3.0-or-later, binutils) — NOT bundled. Located on the
+  user's machine (Arduino-ESP32 core, PlatformIO or ESP-IDF install) and run as a subprocess.
+
+* esp-idf-monitor and esp-idf-panic-decoder (Apache-2.0, Espressif Systems) — no code was
+  copied. The panic text formats recognised here (Guru Meditation header, register dump,
+  "Backtrace: 0xPC:0xSP", "ELF file SHA256:", RISC-V MEPC/RA) and the idea of resolving them
+  with "addr2line -pfiaC -e <elf>" follow the behaviour of these Apache-2.0 projects, which is
+  acknowledged here. https://github.com/espressif/esp-idf-monitor
+  https://github.com/espressif/esp-idf-panic-decoder

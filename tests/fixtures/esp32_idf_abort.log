@@ -1,0 +1,22 @@
+ets Jun  8 2016 00:22:57
+
+rst:0x1 (POWERON_RESET),boot:0x13 (SPI_FAST_FLASH_BOOT)
+I (29) boot: ESP-IDF v5.2.1 2nd stage bootloader
+I (305) app_init: Project name:     desk_voice
+E (5123) audio: i2s_channel_init failed: ESP_ERR_NO_MEM
+ESP_ERROR_CHECK failed: esp_err_t 0x101 (ESP_ERR_NO_MEM) at 0x400d2f1c
+file: "./main/audio.c" line 77
+func: audio_init
+expression: i2s_new_channel(&chan_cfg, &tx_handle, NULL)
+
+abort() was called at PC 0x40086c2b on core 0
+
+
+Backtrace: 0x40081a8a:0x3ffb5a10 0x40086c35:0x3ffb5a30 0x4008d1b2:0x3ffb5a50 0x40086c2b:0x3ffb5ac0 0x400d2f1f:0x3ffb5ae0 0x400d2d86:0x3ffb5b10 0x400d8a1d:0x3ffb5b40
+
+
+
+
+ELF file SHA256: 9e8d7c6b5a4f3e21
+
+Rebooting...

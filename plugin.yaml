@@ -1,0 +1,50 @@
+name: esp32-debug
+version: 0.1.0
+manifest_version: 2
+api_version: 1
+title: ESP32 Debug
+description: "Read-only ESP32 debugging for Hermes: list serial ports and flag ESP32 boards, read chip type / MAC / flash size through esptool (run as a subprocess; resets the board), capture a bounded and redacted serial log, and decode Guru Meditation / abort backtraces (Xtensa and RISC-V) to function and file:line with the Espressif addr2line, checking the ELF SHA256 against the log. Never flashes, erases or writes NVS / eFuses."
+author: snackyear
+kind: general
+license: MIT
+homepage: https://github.com/snackyear/hermes-esp32-debug
+tags: [esp32, embedded, serial, debugging]
+requires_hermes: ">=0.23.0"
+provides_tools:
+  - esp32_list_ports
+  - esp32_chip_info
+  - esp32_serial_capture
+  - esp32_decode_backtrace
+provides_hooks: []
+provides_middleware: []
+requires_env: []
+config_schema:
+  esptool_python:
+    type: str
+    default: ""
+    label: "Python with esptool"
+    description: "Interpreter used as '<python> -m esptool' (esptool is GPL and is never imported). Empty = Hermes' own Python. Example: C:\\Users\\me\\AppData\\Local\\Programs\\Python\\Python312\\python.exe"
+  esptool_timeout:
+    type: int
+    default: 45
+    description: "Seconds before an esptool call is abandoned."
+  default_baud:
+    type: int
+    default: 115200
+    description: "Baud rate for serial capture and esptool when the call does not give one."
+  addr2line_path:
+    type: str
+    default: ""
+    description: "Explicit path to xtensa-*-elf-addr2line(.exe) or riscv32-esp-elf-addr2line(.exe). Empty = auto-detect (Arduino15, PlatformIO, ESP-IDF, PATH)."
+  toolchain_dirs:
+    type: list
+    default: []
+    description: "Extra directories searched for addr2line before the standard locations."
+  default_chip:
+    type: str
+    default: ""
+    description: "Chip used when neither the call nor the log names one, e.g. esp32s3."
+  redact:
+    type: bool
+    default: true
+    description: "Mask Wi-Fi SSID/password, tokens, keys and IP addresses in returned logs."

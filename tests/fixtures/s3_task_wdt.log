@@ -1,0 +1,8 @@
+E (15210) task_wdt: Task watchdog got triggered. The following tasks/users did not reset the watchdog in time:
+E (15210) task_wdt:  - loopTask (CPU 1)
+E (15210) task_wdt: Tasks currently running:
+E (15210) task_wdt: CPU 0: IDLE0
+E (15210) task_wdt: CPU 1: loopTask
+E (15210) task_wdt: Print CPU 1 backtrace
+
+Backtrace: 0x42002e11:0x3fcebe80 0x42002e45:0x3fcebea0 0x42005a12:0x3fcebec0

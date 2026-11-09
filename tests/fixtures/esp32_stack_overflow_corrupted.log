@@ -1,0 +1,11 @@
+***ERROR*** A stack overflow in task tts_task has been detected.
+
+Guru Meditation Error: Core  0 panic'ed (Unhandled debug exception). 
+Debug exception reason: Stack canary watchpoint triggered (tts_task) 
+Core  0 register dump:
+PC      : 0x40088a2c  PS      : 0x00060036  A0      : 0x80088d4f  A1      : 0x3ffb8e60  
+EXCCAUSE: 0x00000001  EXCVADDR: 0x00000000  
+
+Backtrace: 0x40088a29:0x3ffb8e60 0x40088d4c:0x3ffb8e90 0x400d4b11:0x3ffb8ed0 |<-CORRUPTED
+
+ELF file SHA256: 0011223344556677

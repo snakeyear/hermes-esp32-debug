@@ -1,0 +1,36 @@
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x42004a1d
+SPIWP:0xee
+mode:DIO, clock div:1
+load:0x3fce3808,len:0x44c
+entry 0x403c98d4
+[    52][I][main.cpp:41] setup(): StackChan boot v0.3
+I (612) wifi:connected with MyHomeAP-5G, aid = 3, channel 6, BW20, bssid = 12:34:56:78:9a:bc
+I (1201) esp_netif_handlers: sta ip: 192.168.1.57, mask: 255.255.255.0, gw: 192.168.1.1
+[  1302][D][cloud.cpp:88] connect(): token=sk_live_FAKE0123456789abcdef password: hunter2-fake
+Guru Meditation Error: Core  1 panic'ed (LoadProhibited). Exception was unhandled.
+
+Core  1 register dump:
+PC      : 0x42003b5e  PS      : 0x00060630  A0      : 0x82003c0a  A1      : 0x3fcebf40  
+A2      : 0x00000000  A3      : 0x3fc95d20  A4      : 0x00000001  A5      : 0x3fcebf60  
+A6      : 0x00000000  A7      : 0x3fc94a00  A8      : 0x82003b55  A9      : 0x3fcebf20  
+A10     : 0x00000000  A11     : 0x3fc95d24  A12     : 0x00000000  A13     : 0x00000000  
+SAR     : 0x00000010  EXCCAUSE: 0x0000001c  
+EXCVADDR: 0x00000008  LBEG    : 0x400556d5  LEND    : 0x400556e5  LCOUNT  : 0xfffffffd  
+
+
+Backtrace: 0x42003b5b:0x3fcebf40 0x42003c07:0x3fcebf70 0x42006f3e:0x3fcebf90 0x4037a9a6:0x3fcebfb0
+
+
+
+
+ELF file SHA256: 5a1c2e9f0b7d4c33
+
+Rebooting...
+ESP-ROM:esp32s3-20210327
+Build:Mar 27 2021
+rst:0xc (RTC_SW_CPU_RST),boot:0x8 (SPI_FAST_FLASH_BOOT)
+Saved PC:0x42004a1d
+entry 0x403c98d4

@@ -1,0 +1,17 @@
+ESP-ROM:esp32c3-api1-20210207
+rst:0x1 (POWERON),boot:0xc (SPI_FAST_FLASH_BOOT)
+I (321) app: mqtt_pass=FAKEPASS123 broker mqtt://user:fakepw@10.0.0.20:1883
+Guru Meditation Error: Core  0 panic'ed (Store access fault). Exception was unhandled.
+
+Core  0 register dump:
+MEPC    : 0x42005f32  RA      : 0x42005f2c  SP      : 0x3fc8e9a0  GP      : 0x3fc89a00  
+TP      : 0x3fc87d4c  T0      : 0x40057fa6  T1      : 0x0000000f  T2      : 0x00000000  
+MSTATUS : 0x00001881  MTVEC   : 0x40380001  MCAUSE  : 0x00000007  MTVAL   : 0x00000000  
+MHARTID : 0x00000000  
+
+Stack memory:
+3fc8e9a0: 0x00000000 0x00000000 0x3fc8ea00 0x42006b8e 0x00000000 0x00000000 0x00000000 0x00000000
+
+ELF file SHA256: aabbccddeeff0011
+
+Rebooting...

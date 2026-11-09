@@ -1,0 +1,5 @@
+0x42003b5b: Face::draw(Avatar*) at C:/Users/dev/StackChanAssistant/src/face.cpp:57
+0x42003c07: Avatar::update() at C:/Users/dev/StackChanAssistant/src/avatar.cpp:112
+ (inlined by) loop() at C:/Users/dev/StackChanAssistant/src/main.cpp:88
+0x42006f3e: loopTask(void*) at C:/Users/dev/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.0.7/cores/esp32/main.cpp:74
+0x4037a9a6: vPortTaskWrapper at /home/runner/work/esp32-arduino-lib-builder/esp-idf/components/freertos/port.c:139
