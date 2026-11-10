@@ -207,10 +207,9 @@ def test_decode_with_mocked_subprocess_and_sha_mismatch(tmp_path, fixture_text, 
         return subprocess.CompletedProcess(cmd, 0, stdout=body + "\n", stderr="")
 
     monkeypatch.setattr(bt.subprocess, "run", fake_run)
-    h = make_handlers()
+    h = make_handlers(lambda k, d=None: str(exe) if k == "addr2line_path" else d)
     out = json.loads(h["esp32_decode_backtrace"]({
-        "log_text": fixture_text("s3_loadprohibited_bootloop.log"), "elf_path": str(elf),
-        "addr2line_path": str(exe)}))
+        "log_text": fixture_text("s3_loadprohibited_bootloop.log"), "elf_path": str(elf)}))
     assert out["ok"] and out["elf_sha256_match"] is False
     assert any("ELF mismatch" in w for w in out["warnings"])
     cmd, kw = calls[0]
@@ -229,8 +228,8 @@ def test_decode_errors(tmp_path, fixture_text):
     assert out["error"] == "bad_elf" and ".bin" in out["message"]
     elf = tmp_path / "a.elf"
     elf.write_bytes(b"\x7fELF" + b"\x00" * 20)
-    out = json.loads(h["esp32_decode_backtrace"]({"log_text": log, "elf_path": str(elf),
-                                                  "addr2line_path": str(tmp_path / "notepad.exe")}))
+    out = json.loads(make_handlers(lambda k, d=None: str(tmp_path / "notepad.exe") if k == "addr2line_path" else d)
+                     ["esp32_decode_backtrace"]({"log_text": log, "elf_path": str(elf)}))
     assert out["error"] == "addr2line_rejected"
 
 
@@ -239,6 +238,8 @@ def test_decode_addr2line_not_found(tmp_path, fixture_text, monkeypatch):
     monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     monkeypatch.delenv("IDF_TOOLS_PATH", raising=False)
     monkeypatch.setattr(toolchain.shutil, "which", lambda name: None)
+    # Do not search the machine's real Arduino/Espressif trees (C:/Espressif/tools is hardcoded).
+    monkeypatch.setattr(toolchain, "search_roots", lambda extra_dirs=(): [Path(d).expanduser() for d in extra_dirs if d])
     elf = tmp_path / "a.elf"
     elf.write_bytes(b"\x7fELF" + b"\x00" * 20)
     out = json.loads(make_handlers()["esp32_decode_backtrace"]({

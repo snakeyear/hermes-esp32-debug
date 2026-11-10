@@ -95,17 +95,14 @@ DECODE_BACKTRACE = {
         "properties": {
             "log_text": {
                 "type": "string",
-                "description": ("Serial output containing the panic. Omit it (or pass 'last') to reuse the log "
-                                "of the most recent esp32_serial_capture, which avoids re-typing addresses."),
+                "description": ("Serial output containing the panic (at most 256 KiB, the same cap as a capture). "
+                                "Omit it (or pass 'last') to reuse the log of the most recent esp32_serial_capture, "
+                                "which avoids re-typing addresses."),
             },
             "elf_path": {"type": "string", "description": "Path to the firmware .elf for the flashed build."},
             "chip": {
                 "type": "string",
                 "description": "Chip, e.g. 'esp32s3', 'esp32', 'esp32c3'. Optional; inferred from the log when possible.",
-            },
-            "addr2line_path": {
-                "type": "string",
-                "description": "Optional explicit path to xtensa-*-elf-addr2line / riscv32-esp-elf-addr2line.",
             },
             "which_panic": {
                 "type": "string",

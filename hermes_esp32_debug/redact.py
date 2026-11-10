@@ -24,7 +24,8 @@ _KV_RE = re.compile(
 _WIFI_CONNECTED_RE = re.compile(r"(?i)(connected with |connecting to |ssid\s*[\"'])([^,\"'\r\n]+)")
 _BEARER_RE = re.compile(r"(?i)\b(bearer)\s+[A-Za-z0-9._~+/=-]{8,}")
 _URL_QUERY_RE = re.compile(r"(?i)([?&](?:token|key|sig|signature|access_token|apikey|api_key|auth|password)=)[^&\s]+")
-_URL_USERINFO_RE = re.compile(r"(?i)\b([a-z][a-z0-9+.-]*://)[^/\s:@]+:[^/\s@]+@")
+# Scheme is length-capped ({0,31}) so a long run of dots cannot go quadratic on the first group.
+_URL_USERINFO_RE = re.compile(r"(?i)\b([a-z][a-z0-9+.-]{0,31}://)[^/\s:@]{1,256}:[^/\s@]{1,256}@")
 _JWT_RE = re.compile(r"\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b")
 # IPv4 (each octet 0-255). Hex addresses like 0x3fc9 never match (no dots).
 _OCTET = r"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)"

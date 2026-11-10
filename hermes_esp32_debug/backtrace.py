@@ -15,6 +15,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
 
+from .proc import run_isolated
+
 # --- panic text patterns ---------------------------------------------------
 
 GURU_RE = re.compile(r"Guru Meditation Error:\s*Core\s+(?P<core>\d+)\s+panic'ed\s+\((?P<reason>[^)]+)\)(?P<rest>[^\r\n]*)")
@@ -287,13 +289,13 @@ def parse_addr2line_output(output: str) -> list[dict]:
     return frames
 
 
-def run_addr2line(addr2line: str, elf: str, addresses: list[str], timeout: float = 20.0) -> tuple[list[dict], Optional[str]]:
+def run_addr2line(addr2line: str, elf: str, addresses: list[str], timeout: float = 20.0,
+                  cwd=None) -> tuple[list[dict], Optional[str]]:
     if not addresses:
         return [], None
     cmd = [addr2line, "-pfiaC", "-e", elf, *addresses]
     try:
-        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout, check=False,
-                              stdin=subprocess.DEVNULL)
+        proc = run_isolated(cmd, timeout=timeout, cwd=cwd, runner=subprocess.run)
     except FileNotFoundError:
         return [], f"addr2line not found: {addr2line}"
     except subprocess.TimeoutExpired:

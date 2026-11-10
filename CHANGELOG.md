@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.3 — 2026-11-10
+Catalog-review security fixes (requested changes on NousResearch/hermes-agent#151794):
+- `addr2line_path` is no longer a tool argument: it is read only from the plugin setting (or auto-detected). A path in the tool call is ignored.
+- `python -m esptool` is launched with `-P` (safe path; Python 3.11+, required by this plugin) and a neutral `cwd` (the plugin data dir). The same `cwd` is used for addr2line.
+- esptool and addr2line receive an explicit minimal environment (`PATH`, `HOME`, `LANG`; plus `SYSTEMROOT`/`TEMP`/`USERPROFILE` on Windows), never the inherited Hermes environment.
+- URL-userinfo redaction regex is no longer quadratic on long dotted text; `log_text` is rejected above the 256 KiB capture cap.
+- `last_capture.json` is stored under `<hermes home>/plugin-data/esp32-debug/` (mode 0600, best-effort on Windows) instead of the shared temp directory.
+
 ## 0.1.2 — 2026-11-09
 Fixes from the first end-to-end run on real hardware (M5Stack CoreS3 StackChan, Windows 11, native USB-Serial/JTAG):
 - `esp32_serial_capture(reset=true)` did not reset native-USB ESP32-S3 boards on Windows: usbser.sys ignores an RTS change

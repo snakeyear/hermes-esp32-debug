@@ -24,6 +24,8 @@ import sys
 from pathlib import Path
 from typing import Optional
 
+from .proc import python_module_cmd, python_script_cmd, run_isolated
+
 READ_ONLY_COMMANDS = ("flash-id", "chip-id")  # allow-list; nothing else is ever passed
 
 _CHIP_TYPE_RE = re.compile(r"^(?:Chip type:\s*|Chip is\s+)(?P<v>.+?)\s*$", re.M)
@@ -121,7 +123,7 @@ def _home() -> Path:
 
 def _launcher_for_file(path: Path) -> list[str]:
     if path.name.lower().endswith(".py"):
-        return [sys.executable, str(path)]
+        return python_script_cmd(sys.executable, str(path))
     return [str(path)]
 
 
@@ -162,27 +164,26 @@ def resolve_esptool(esptool_path: Optional[str] = None, esptool_python: Optional
             raise EsptoolPathError(f"esptool_path does not exist: {p}")
         return _launcher_for_file(p), "esptool_path"
     if esptool_python:
-        return [str(esptool_python), "-m", "esptool"], "esptool_python"
+        return python_module_cmd(str(esptool_python), "esptool"), "esptool_python"
     auto = autodetect_esptool()
     if auto is not None:
         return _launcher_for_file(auto), "autodetect"
-    return [sys.executable, "-m", "esptool"], "hermes_python"
+    return python_module_cmd(sys.executable, "esptool"), "hermes_python"
 
 
 def build_command(launcher, port: str, command: str, baud: int = 115200) -> list[str]:
     """``launcher`` is an argv prefix (list) or, for compatibility, a Python path (str)."""
     if command.replace("_", "-") not in READ_ONLY_COMMANDS:
         raise ValueError(f"refusing non read-only esptool command: {command!r}")
-    prefix = [launcher, "-m", "esptool"] if isinstance(launcher, str) else list(launcher)
+    prefix = python_module_cmd(launcher, "esptool") if isinstance(launcher, str) else list(launcher)
     return [*prefix, "--port", port, "--baud", str(int(baud)), command]
 
 
 def run_esptool(launcher, port: str, command: str, baud: int, timeout: float,
-                runner=subprocess.run) -> tuple[int, str]:
+                runner=subprocess.run, cwd=None) -> tuple[int, str]:
     cmd = build_command(launcher, port, command, baud)
     try:
-        proc = runner(cmd, capture_output=True, text=True, timeout=timeout, check=False,
-                      stdin=subprocess.DEVNULL)
+        proc = run_isolated(cmd, timeout=timeout, cwd=cwd, runner=runner)
     except subprocess.TimeoutExpired as exc:
         partial = (exc.stdout or "") if isinstance(exc.stdout, str) else ""
         return -1, partial + f"\n[esp32-debug] esptool timed out after {timeout:.0f}s"
@@ -194,7 +195,7 @@ def run_esptool(launcher, port: str, command: str, baud: int, timeout: float,
 
 
 def chip_info(port: str, *, python: Optional[str] = None, esptool_path: Optional[str] = None,
-              baud: int = 115200, timeout: float = 45.0, runner=subprocess.run) -> dict:
+              baud: int = 115200, timeout: float = 45.0, runner=subprocess.run, cwd=None) -> dict:
     """Run ``flash-id`` (prints chip, features, crystal, MAC and flash size in one reset);
     fall back to ``chip-id`` (and the esptool v4 underscore spelling) only when needed."""
     try:
@@ -204,10 +205,10 @@ def chip_info(port: str, *, python: Optional[str] = None, esptool_path: Optional
     attempts: list[dict] = []
     merged: dict = {}
     for command in ("flash-id", "chip-id"):
-        rc, out = run_esptool(launcher, port, command, baud, timeout, runner)
+        rc, out = run_esptool(launcher, port, command, baud, timeout, runner, cwd=cwd)
         if rc != 0 and "invalid choice" in out.lower():  # esptool v4 used underscores
             command = command.replace("-", "_")
-            rc, out = run_esptool(launcher, port, command, baud, timeout, runner)
+            rc, out = run_esptool(launcher, port, command, baud, timeout, runner, cwd=cwd)
         attempts.append({"command": command, "returncode": rc})
         parsed = parse_esptool_output(out)
         for k, v in parsed.items():

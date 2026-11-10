@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import tempfile
 import time
 from pathlib import Path
 from typing import Any, Callable, Optional
@@ -13,6 +12,7 @@ from typing import Any, Callable, Optional
 from . import backtrace as bt
 from . import capture as cap
 from . import chipinfo, ports, toolchain
+from .proc import LOG_TEXT_MAX_BYTES, _chmod_best_effort, plugin_data_dir
 from .redact import redact
 
 logger = logging.getLogger(__name__)
@@ -58,7 +58,8 @@ def _serial_missing() -> Optional[str]:
 
 
 def default_cache_dir() -> Path:
-    return Path(os.environ.get("ESP32_DEBUG_CACHE_DIR") or (Path(tempfile.gettempdir()) / "hermes-esp32-debug"))
+    """Hermes plugin-data dir (``<hermes home>/plugin-data/esp32-debug``), overridable."""
+    return plugin_data_dir(create=True)
 
 
 def _save_last_capture(cache_dir: Path, port: str, text: str) -> Optional[str]:
@@ -66,11 +67,14 @@ def _save_last_capture(cache_dir: Path, port: str, text: str) -> Optional[str]:
     the model re-typing hex addresses. Host-side temp file only; nothing goes to the device."""
     try:
         cache_dir.mkdir(parents=True, exist_ok=True)
+        _chmod_best_effort(cache_dir, 0o700)
         path = cache_dir / "last_capture.json"
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps({"port": port, "time": time.time(), "log": text}, ensure_ascii=False),
                        encoding="utf-8")
+        _chmod_best_effort(tmp, 0o600)
         os.replace(tmp, path)
+        _chmod_best_effort(path, 0o600)
         return str(path)
     except OSError:
         return None
@@ -122,7 +126,7 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             timeout = float(_int(setting("esptool_timeout", 45), 45))
             kw = {"runner": runner} if runner else {}
             result = chipinfo.chip_info(port, python=python, esptool_path=setting("esptool_path", None),
-                                        baud=baud, timeout=timeout, **kw)
+                                        baud=baud, timeout=timeout, cwd=cache, **kw)
             if "output_tail" in result and _bool(setting("redact", True), True):
                 result["output_tail"] = redact(result["output_tail"])
             result["port"] = port
@@ -196,6 +200,15 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             log_text = str(args.get("log_text") or "")
             elf_path = str(args.get("elf_path") or "").strip()
             log_source = "log_text"
+            # A non-sentinel log_text is capped at the capture size (256 KiB).
+            if log_text.strip() and log_text.strip().lower() not in ("last", "last_capture"):
+                if len(log_text.encode("utf-8", errors="replace")) > LOG_TEXT_MAX_BYTES:
+                    return _err(
+                        "log_text_too_long",
+                        f"log_text exceeds {LOG_TEXT_MAX_BYTES} bytes (the serial-capture cap). "
+                        "Pass a shorter excerpt, or omit log_text to reuse the last capture.",
+                        max_bytes=LOG_TEXT_MAX_BYTES,
+                    )
             if not log_text.strip() or log_text.strip().lower() in ("last", "last_capture"):
                 last = _load_last_capture(cache)
                 if not last or not str(last.get("log") or "").strip():
@@ -218,7 +231,8 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
             dirs = setting("toolchain_dirs", []) or []
             if isinstance(dirs, str):
                 dirs = [d.strip() for d in dirs.split(";") if d.strip()]
-            explicit = args.get("addr2line_path") or setting("addr2line_path", None)
+            # addr2line_path is a plugin setting only — never taken from the tool call.
+            explicit = setting("addr2line_path", None)
             a2l, searched = toolchain.find_addr2line(chip, arch, explicit, dirs)
             if not a2l:
                 if explicit:
@@ -229,7 +243,7 @@ def make_handlers(get_setting: SettingsGetter = _no_settings, *, serial_module=N
                             "Espressif addr2line not found. Install the ESP32 Arduino core / PlatformIO / ESP-IDF, "
                             "or set the plugin setting 'addr2line_path' or 'toolchain_dirs'.",
                             chip=chip, arch=arch, searched=searched[:20], addresses=addresses)
-            frames, error = bt.run_addr2line(a2l, elf_path, addresses)
+            frames, error = bt.run_addr2line(a2l, elf_path, addresses, cwd=cache)
             if error:
                 return _err("addr2line_failed", error, addr2line=a2l)
             warnings: list[str] = []

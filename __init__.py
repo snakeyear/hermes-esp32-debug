@@ -26,7 +26,13 @@ def register(ctx):
             return default
         return getter(key, default=default)
 
-    handlers = make_handlers(get_setting)
+    cache_dir = None
+    state = getattr(ctx, "state", None)
+    data_dir = getattr(state, "data_dir", None) if state is not None else None
+    if data_dir is not None:
+        cache_dir = Path(data_dir)
+
+    handlers = make_handlers(get_setting, cache_dir=cache_dir)
     for schema in schemas.ALL:
         ctx.register_tool(
             name=schema["name"],

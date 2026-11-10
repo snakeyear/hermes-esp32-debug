@@ -75,14 +75,15 @@ def test_decode_reuses_last_capture(fake_serial_module, fixture_text, tmp_path, 
         return subprocess.CompletedProcess(cmd, 0, stdout=body + "\n", stderr="")
 
     monkeypatch.setattr(bt.subprocess, "run", fake_run)
-    h = make_handlers(serial_module=fake_serial_module(log.encode()), cache_dir=tmp_path)
+    h = make_handlers(lambda k, d=None: str(exe) if k == "addr2line_path" else d,
+                      serial_module=fake_serial_module(log.encode()), cache_dir=tmp_path)
     json.loads(h["esp32_serial_capture"]({"port": "COM7", "seconds": 5}))
-    out = json.loads(h["esp32_decode_backtrace"]({"elf_path": str(elf), "addr2line_path": str(exe)}))
+    out = json.loads(h["esp32_decode_backtrace"]({"elf_path": str(elf)}))
     assert out["ok"], out
     assert out["log_source"].startswith("last_capture (COM7")
     assert out["elf_sha256_match"] is True
     assert out["first_project_frame"]["location"] == "C:\\sk\\crash_demo.cpp:28"
-    out2 = json.loads(h["esp32_decode_backtrace"]({"log_text": "last", "elf_path": str(elf), "addr2line_path": str(exe)}))
+    out2 = json.loads(h["esp32_decode_backtrace"]({"log_text": "last", "elf_path": str(elf)}))
     assert out2["ok"] and out2["log_source"].startswith("last_capture")
 
 

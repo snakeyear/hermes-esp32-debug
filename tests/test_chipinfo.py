@@ -66,7 +66,7 @@ def test_parse_v4():
 
 def test_command_allow_list():
     cmd = chipinfo.build_command("py", "COM5", "flash-id")
-    assert cmd == ["py", "-m", "esptool", "--port", "COM5", "--baud", "115200", "flash-id"]
+    assert cmd == ["py", "-P", "-m", "esptool", "--port", "COM5", "--baud", "115200", "flash-id"]
     for bad in ("write-flash", "erase-flash", "write_flash", "burn-efuse", "write-mem", "erase-region"):
         with pytest.raises(ValueError):
             chipinfo.build_command("py", "COM5", bad)
@@ -92,7 +92,7 @@ def test_chip_info_single_reset_when_flash_id_has_everything():
     assert res["ok"] and res["mac"] == "34:85:18:aa:bb:cc" and res["flash_size"] == "16MB"
     assert len(r.calls) == 1
     cmd, kw = r.calls[0]
-    assert cmd[:3] == ["C:/Python312/python.exe", "-m", "esptool"]
+    assert cmd[:4] == ["C:/Python312/python.exe", "-P", "-m", "esptool"]
     assert "timeout" in kw and kw["timeout"] > 0
     assert "import esptool" not in open(chipinfo.__file__, encoding="utf-8").read()
 
@@ -189,7 +189,7 @@ def test_autodetect_platformio_script_runs_with_python(fake_home):
     home, _ = fake_home
     script = _touch(home / ".platformio" / "packages" / "tool-esptoolpy" / "esptool.py")
     launcher, source = chipinfo.resolve_esptool()
-    assert launcher == [sys.executable, str(script)] and source == "autodetect"
+    assert launcher == [sys.executable, "-P", str(script)] and source == "autodetect"
 
 
 def test_resolution_order(fake_home, tmp_path):
@@ -199,12 +199,12 @@ def test_resolution_order(fake_home, tmp_path):
     # 1. esptool_path wins over everything
     assert chipinfo.resolve_esptool(str(explicit), "C:/Py/python.exe") == ([str(explicit)], "esptool_path")
     # 2. esptool_python beats auto-detect
-    assert chipinfo.resolve_esptool(None, "C:/Py/python.exe") == (["C:/Py/python.exe", "-m", "esptool"], "esptool_python")
+    assert chipinfo.resolve_esptool(None, "C:/Py/python.exe") == (["C:/Py/python.exe", "-P", "-m", "esptool"], "esptool_python")
     # 3. auto-detect
     assert chipinfo.resolve_esptool() == ([str(auto)], "autodetect")
     # 4. Hermes' own python
     auto.unlink()
-    assert chipinfo.resolve_esptool() == ([sys.executable, "-m", "esptool"], "hermes_python")
+    assert chipinfo.resolve_esptool() == ([sys.executable, "-P", "-m", "esptool"], "hermes_python")
 
 
 @pytest.mark.parametrize("name", ["calc.exe", "esptool_wrapper.bat", "python.exe", "esptool.cmd"])
